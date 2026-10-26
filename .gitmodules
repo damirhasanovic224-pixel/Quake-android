@@ -1,0 +1,9 @@
+[submodule "third_party/SDL"]
+	path = third_party/SDL
+	url = https://github.com/libsdl-org/SDL.git
+[submodule "third_party/gl4es"]
+	path = third_party/gl4es
+	url = https://github.com/ptitSeb/gl4es.git
+[submodule "third_party/quakespasm"]
+	path = third_party/quakespasm
+	url = https://github.com/sezero/quakespasm.git
