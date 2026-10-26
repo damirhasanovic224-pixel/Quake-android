@@ -20,7 +20,7 @@ public class LauncherActivity extends Activity {
                     "Turn on \"Allow access to manage all files\", then open Quake again",
                     Toast.LENGTH_LONG).show();
             startActivity(new Intent(
-                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION_SETTINGS,
+                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
                     Uri.parse("package:" + getPackageName())));
         }
         finish();

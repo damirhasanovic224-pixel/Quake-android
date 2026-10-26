@@ -8,7 +8,7 @@ public class QuakeActivity extends SDLActivity {
     static final String BASE_DIR = "/storage/emulated/0/Quake";
 
     @Override
-    protected void loadLibraries() {
+    public void loadLibraries() {
         // hidapi only exists in some SDL2 builds, so don't fail if it's missing
         try {
             System.loadLibrary("hidapi");
