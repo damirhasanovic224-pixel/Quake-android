@@ -24,7 +24,7 @@ file(GLOB QS_SOURCES CONFIGURE_DEPENDS "${QS_DIR}/*.c")
 
 # drop the Windows / non-SDL variants
 list(FILTER QS_SOURCES EXCLUDE REGEX
-     "/(sys_sdl_win|pl_win|net_win|net_wins|net_wipx|net_none|gl_vidnt|snd_null|cd_sdl|in_win)\\.c$")
+     "/(sys_sdl_win|pl_win|net_win|net_wins|net_wipx|net_none|gl_vidnt|snd_null|cd_sdl|in_win|lodepng)\\.c$")
 
 add_library(main SHARED ${QS_SOURCES} android_log.c)
 
