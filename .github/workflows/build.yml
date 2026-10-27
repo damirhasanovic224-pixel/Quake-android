@@ -68,7 +68,11 @@ jobs:
             echo '```'
             echo '### libGL files in the build folder'
             echo '```'
-            find app/build -name 'libGL*' 2>/dev/null || true
+            find app/build app/.cxx -name 'libGL*' 2>/dev/null || true
+            echo '```'
+            echo '### gl4es settings seen by CMake'
+            echo '```'
+            for f in $(find app/.cxx -name 'gl_props_before.txt' 2>/dev/null | head -n 1); do cat "$f"; done
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 

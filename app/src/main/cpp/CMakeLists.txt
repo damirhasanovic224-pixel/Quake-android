@@ -19,11 +19,27 @@ set(DEFAULT_ES 2   CACHE STRING "" FORCE)
 add_compile_definitions(DEFAULT_ES=2)
 add_subdirectory(${GL4ES_DIR} gl4es)
 
-# Android only packages files named exactly lib*.so, so remove the
-# version suffix (libGL.so.1) that gl4es adds by default.
+# Android only loads files named exactly lib*.so, but gl4es names itself
+# libGL.so.1. Record its settings (for debugging), then force plain libGL.so.
 if(TARGET GL)
+    set(_dump "")
+    foreach(_p TYPE OUTPUT_NAME PREFIX SUFFIX VERSION SOVERSION NO_SONAME
+               LINK_FLAGS LINK_OPTIONS LIBRARY_OUTPUT_DIRECTORY)
+        get_target_property(_v GL ${_p})
+        string(APPEND _dump "${_p} = ${_v}\n")
+    endforeach()
+    file(WRITE "${CMAKE_BINARY_DIR}/gl_props_before.txt" "${_dump}")
+
     set_property(TARGET GL PROPERTY VERSION)
     set_property(TARGET GL PROPERTY SOVERSION)
+    set_target_properties(GL PROPERTIES
+        OUTPUT_NAME "GL"
+        PREFIX "lib"
+        SUFFIX ".so"
+        NO_SONAME OFF)
+    target_link_options(GL PRIVATE "-Wl,-soname,libGL.so")
+else()
+    file(WRITE "${CMAKE_BINARY_DIR}/gl_props_before.txt" "No CMake target named GL exists\n")
 endif()
 
 # ---------------- QuakeSpasm ----------------
