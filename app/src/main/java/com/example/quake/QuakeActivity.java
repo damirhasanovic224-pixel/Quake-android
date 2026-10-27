@@ -2,12 +2,15 @@ package com.example.quake;
 
 import android.graphics.Rect;
 import android.os.Bundle;
+import android.system.Os;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileOutputStream;
 
 import org.libsdl.app.SDLActivity;
@@ -22,6 +25,7 @@ public class QuakeActivity extends SDLActivity {
 
     @Override
     public void loadLibraries() {
+        applyGl4esEnv();   // must happen before libGL (gl4es) is loaded
         // hidapi only exists in some SDL2 builds, so don't fail if it's missing
         try {
             System.loadLibrary("hidapi");
@@ -30,6 +34,31 @@ public class QuakeActivity extends SDLActivity {
         System.loadLibrary("SDL2");
         System.loadLibrary("GL");     // gl4es (desktop GL -> GLES)
         System.loadLibrary("main");   // our Quake engine
+    }
+
+    /** Reads Quake/gl4es_env.txt (one KEY=VALUE per line) and sets those variables for gl4es. */
+    private void applyGl4esEnv() {
+        try {
+            File f = new File(BASE_DIR, "gl4es_env.txt");
+            if (!f.exists()) {
+                new File(BASE_DIR).mkdirs();
+                FileOutputStream out = new FileOutputStream(f);
+                out.write(("# gl4es settings, one KEY=VALUE per line. Restart the game after editing.\n"
+                         + "LIBGL_BEGINEND=0\n").getBytes("UTF-8"));
+                out.close();
+            }
+            BufferedReader in = new BufferedReader(new FileReader(f));
+            String line;
+            while ((line = in.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                int eq = line.indexOf('=');
+                if (eq <= 0) continue;
+                Os.setenv(line.substring(0, eq).trim(), line.substring(eq + 1).trim(), true);
+            }
+            in.close();
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
@@ -96,7 +125,8 @@ public class QuakeActivity extends SDLActivity {
               + "scr_menuscale 3\n"
               + "scr_sbarscale 3\n"
               + "scr_conscale 3\n"
-              + "crosshair 1\n";
+              + "crosshair 1\n"
+              + "scr_showfps 1\n";
             FileOutputStream out = new FileOutputStream(new File(dir, "autoexec.cfg"));
             out.write(cfg.getBytes("UTF-8"));
             out.close();
