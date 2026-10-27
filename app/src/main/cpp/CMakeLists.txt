@@ -19,10 +19,17 @@ set(DEFAULT_ES 2   CACHE STRING "" FORCE)
 add_compile_definitions(DEFAULT_ES=2)
 add_subdirectory(${GL4ES_DIR} gl4es)
 
+# Android only packages files named exactly lib*.so, so remove the
+# version suffix (libGL.so.1) that gl4es adds by default.
+if(TARGET GL)
+    set_property(TARGET GL PROPERTY VERSION)
+    set_property(TARGET GL PROPERTY SOVERSION)
+endif()
+
 # ---------------- QuakeSpasm ----------------
 file(GLOB QS_SOURCES CONFIGURE_DEPENDS "${QS_DIR}/*.c")
 
-# drop the Windows / non-SDL variants
+# drop the Windows / non-SDL variants (lodepng.c is already included by image.c)
 list(FILTER QS_SOURCES EXCLUDE REGEX
      "/(sys_sdl_win|pl_win|net_win|net_wins|net_wipx|net_none|gl_vidnt|snd_null|cd_sdl|in_win|lodepng)\\.c$")
 
@@ -45,9 +52,3 @@ if(TARGET SDL2::SDL2main)
     target_link_libraries(main PRIVATE SDL2::SDL2main)
 endif()
 target_link_libraries(main PRIVATE SDL2::SDL2 GL log m)
-
-foreach(t GL SDL2 hidapi)
-  if(TARGET ${t})
-    set_target_properties(${t} PROPERTIES VERSION "" SOVERSION "")
-  endif()
-endforeach()

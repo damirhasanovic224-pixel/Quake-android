@@ -48,6 +48,30 @@ jobs:
           set -o pipefail
           gradle assembleDebug --console=plain 2>&1 | tee build.log
 
+      - name: Show which libraries ended up in the APK
+        if: always()
+        shell: bash
+        run: |
+          APK=$(ls app/build/outputs/apk/debug/*.apk 2>/dev/null | head -n1 || true)
+          READELF="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          {
+            echo '### Libraries inside the APK'
+            echo '```'
+            if [ -n "$APK" ]; then unzip -l "$APK" | grep "lib/" || true; else echo "no apk built"; fi
+            echo '```'
+            echo '### What libmain.so needs'
+            echo '```'
+            if [ -n "$APK" ]; then
+              unzip -p "$APK" lib/arm64-v8a/libmain.so > /tmp/libmain.so || true
+              "$READELF" -d /tmp/libmain.so 2>&1 | grep -E "NEEDED|SONAME" || true
+            fi
+            echo '```'
+            echo '### libGL files in the build folder'
+            echo '```'
+            find app/build -name 'libGL*' 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Put errors on the run summary page
         if: failure()
         shell: bash
