@@ -1,18 +1,21 @@
 package com.example.quake;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.RectF;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+
+import java.util.Locale;
 
 import org.libsdl.app.SDLActivity;
 
 /** Transparent on-screen controls drawn on top of the game. */
 public class TouchOverlay extends View {
 
-    private static final float LOOK_SPEED = 1.3f;
     private static final int MAX_POINTERS = 32;
 
     private static final int ROLE_NONE = 0;
@@ -22,7 +25,7 @@ public class TouchOverlay extends View {
 
     private static class Btn {
         final String label;
-        final int key;
+        final int key;          // 0 = not a key button
         float x, y, r;
         boolean pressed;
         Btn(String label, int key) {
@@ -35,22 +38,40 @@ public class TouchOverlay extends View {
     private final Btn jump = new Btn("JUMP", KeyEvent.KEYCODE_SPACE);
     private final Btn weapon = new Btn("WPN", KeyEvent.KEYCODE_E);
     private final Btn menu = new Btn("MENU", KeyEvent.KEYCODE_ESCAPE);
-    private final Btn[] buttons = { fire, jump, weapon, menu };
+    private final Btn settingsBtn = new Btn("SET", 0);
+    private final Btn[] buttons = { fire, jump, weapon, menu, settingsBtn };
 
     private final int[] role = new int[MAX_POINTERS];
     private final Btn[] heldButton = new Btn[MAX_POINTERS];
 
+    // movement stick
     private int stickId = -1;
     private float defStickX, defStickY;
     private float stickX, stickY, stickCurX, stickCurY, stickRadius;
-    private boolean kUp, kDown, kLeft, kRight;
+    private boolean kUp, kDown, kLeft, kRight, kRun;
 
+    // look
     private int lookId = -1;
     private float lastX, lastY;
+
+    // saved settings
+    private final SharedPreferences prefs;
+    private float lookSpeed;        // multiplier on top of Quake's own sensitivity
+    private float runThreshold;     // fraction of the stick radius where running starts
+    private boolean invertLook;
+
+    // settings panel
+    private boolean panelOpen = false;
+    private final RectF panel = new RectF();
+    private final RectF lookMinus = new RectF(), lookPlus = new RectF();
+    private final RectF runMinus = new RectF(), runPlus = new RectF();
+    private final RectF invertBox = new RectF(), closeBox = new RectF();
+    private float rowLookY, rowRunY, rowInvertY, titleY;
 
     private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint leftText = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     public TouchOverlay(Context context) {
         super(context);
@@ -58,17 +79,26 @@ public class TouchOverlay extends View {
         ringPaint.setStyle(Paint.Style.STROKE);
         ringPaint.setStrokeWidth(4f);
         ringPaint.setColor(0x88FFFFFF);
-        textPaint.setColor(0xCCFFFFFF);
+        textPaint.setColor(0xDDFFFFFF);
         textPaint.setTextAlign(Paint.Align.CENTER);
+        leftText.setColor(0xFFFFFFFF);
+        leftText.setTextAlign(Paint.Align.LEFT);
+
+        prefs = context.getSharedPreferences("controls", Context.MODE_PRIVATE);
+        lookSpeed = prefs.getFloat("look", 1.3f);
+        runThreshold = prefs.getFloat("run", 0.55f);
+        invertLook = prefs.getBoolean("invert", false);
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         float r = 0.11f * Math.min(w, h);
-        fire.r = r;     fire.x = w - 1.5f * r;   fire.y = h - 1.8f * r;
-        jump.r = r;     jump.x = w - 4.0f * r;   jump.y = h - 1.2f * r;
+        fire.r = r;          fire.x = w - 1.5f * r;   fire.y = h - 1.8f * r;
+        jump.r = r;          jump.x = w - 4.0f * r;   jump.y = h - 1.2f * r;
         weapon.r = 0.8f * r; weapon.x = w - 1.5f * r; weapon.y = h - 4.4f * r;
-        menu.r = 0.7f * r;   menu.x = w * 0.5f;  menu.y = menu.r * 1.3f;
+        menu.r = 0.7f * r;   menu.x = w * 0.5f;       menu.y = menu.r * 1.3f;
+        settingsBtn.r = 0.6f * r; settingsBtn.x = 1.4f * r; settingsBtn.y = 1.2f * r;
+
         stickRadius = 1.5f * r;
         defStickX = 2.6f * r;
         defStickY = h - 2.6f * r;
@@ -79,6 +109,29 @@ public class TouchOverlay extends View {
             stickCurY = stickY;
         }
         textPaint.setTextSize(0.45f * r);
+        leftText.setTextSize(0.5f * r);
+
+        // settings panel layout
+        panel.set(0.18f * w, 0.10f * h, 0.82f * w, 0.90f * h);
+        float ph = panel.height();
+        float bs = 0.13f * h;
+        titleY = panel.top + 0.12f * ph;
+        rowLookY = panel.top + 0.34f * ph;
+        rowRunY = panel.top + 0.53f * ph;
+        rowInvertY = panel.top + 0.72f * ph;
+        float plusCx = panel.right - 0.07f * panel.width() - bs / 2f;
+        float minusCx = plusCx - bs * 1.5f;
+        setRect(lookPlus, plusCx, rowLookY, bs);
+        setRect(lookMinus, minusCx, rowLookY, bs);
+        setRect(runPlus, plusCx, rowRunY, bs);
+        setRect(runMinus, minusCx, rowRunY, bs);
+        setRect(invertBox, plusCx, rowInvertY, bs);
+        closeBox.set(panel.centerX() - 0.12f * w, panel.top + 0.80f * ph,
+                     panel.centerX() + 0.12f * w, panel.top + 0.80f * ph + bs);
+    }
+
+    private static void setRect(RectF rect, float cx, float cy, float size) {
+        rect.set(cx - size / 2f, cy - size / 2f, cx + size / 2f, cy + size / 2f);
     }
 
     // ---- sending input to SDL ----
@@ -97,12 +150,30 @@ public class TouchOverlay extends View {
         return now;
     }
 
+    private void saveSettings() {
+        prefs.edit()
+             .putFloat("look", lookSpeed)
+             .putFloat("run", runThreshold)
+             .putBoolean("invert", invertLook)
+             .apply();
+    }
+
     // ---- touch handling ----
 
     @Override
     public boolean onTouchEvent(MotionEvent e) {
         int idx = e.getActionIndex();
-        switch (e.getActionMasked()) {
+        int action = e.getActionMasked();
+
+        if (panelOpen) {
+            if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
+                panelTap(e.getX(idx), e.getY(idx));
+                invalidate();
+            }
+            return true;
+        }
+
+        switch (action) {
             case MotionEvent.ACTION_DOWN:
             case MotionEvent.ACTION_POINTER_DOWN:
                 pointerDown(e.getPointerId(idx), e.getX(idx), e.getY(idx));
@@ -117,7 +188,7 @@ public class TouchOverlay extends View {
                 pointerUp(e.getPointerId(idx));
                 break;
             case MotionEvent.ACTION_CANCEL:
-                for (int id = 0; id < MAX_POINTERS; id++) pointerUp(id);
+                releaseAll();
                 break;
             default:
                 break;
@@ -126,12 +197,21 @@ public class TouchOverlay extends View {
         return true;
     }
 
+    private void releaseAll() {
+        for (int id = 0; id < MAX_POINTERS; id++) pointerUp(id);
+    }
+
     private void pointerDown(int id, float x, float y) {
         if (id < 0 || id >= MAX_POINTERS) return;
         for (Btn b : buttons) {
             float dx = x - b.x;
             float dy = y - b.y;
             if (dx * dx + dy * dy <= b.r * b.r * 1.4f) {
+                if (b == settingsBtn) {
+                    releaseAll();
+                    panelOpen = true;
+                    return;
+                }
                 b.pressed = true;
                 heldButton[id] = b;
                 role[id] = ROLE_BUTTON;
@@ -163,19 +243,22 @@ public class TouchOverlay extends View {
             stickCurY = y;
             float dx = x - stickX;
             float dy = y - stickY;
-            float t = stickRadius * 0.3f;
-            kUp = setKey(KeyEvent.KEYCODE_DPAD_UP, kUp, dy < -t);
-            kDown = setKey(KeyEvent.KEYCODE_DPAD_DOWN, kDown, dy > t);
-            kLeft = setKey(KeyEvent.KEYCODE_DPAD_LEFT, kLeft, dx < -t);
-            kRight = setKey(KeyEvent.KEYCODE_DPAD_RIGHT, kRight, dx > t);
+            float dead = stickRadius * 0.3f;
+            float runAt = stickRadius * runThreshold;
+            kUp = setKey(KeyEvent.KEYCODE_DPAD_UP, kUp, dy < -dead);
+            kDown = setKey(KeyEvent.KEYCODE_DPAD_DOWN, kDown, dy > dead);
+            kLeft = setKey(KeyEvent.KEYCODE_DPAD_LEFT, kLeft, dx < -dead);
+            kRight = setKey(KeyEvent.KEYCODE_DPAD_RIGHT, kRight, dx > dead);
+            kRun = setKey(KeyEvent.KEYCODE_SHIFT_LEFT, kRun, dy < -runAt);
         } else if (role[id] == ROLE_LOOK) {
             float dx = x - lastX;
             float dy = y - lastY;
             lastX = x;
             lastY = y;
             if (dx != 0f || dy != 0f) {
+                float sy = invertLook ? -lookSpeed : lookSpeed;
                 SDLActivity.onNativeMouse(0, MotionEvent.ACTION_MOVE,
-                        dx * LOOK_SPEED, dy * LOOK_SPEED, true);
+                        dx * lookSpeed, dy * sy, true);
             }
         }
     }
@@ -196,6 +279,7 @@ public class TouchOverlay extends View {
             kDown = setKey(KeyEvent.KEYCODE_DPAD_DOWN, kDown, false);
             kLeft = setKey(KeyEvent.KEYCODE_DPAD_LEFT, kLeft, false);
             kRight = setKey(KeyEvent.KEYCODE_DPAD_RIGHT, kRight, false);
+            kRun = setKey(KeyEvent.KEYCODE_SHIFT_LEFT, kRun, false);
             stickX = defStickX;
             stickY = defStickY;
             stickCurX = stickX;
@@ -204,6 +288,23 @@ public class TouchOverlay extends View {
             lookId = -1;
         }
         role[id] = ROLE_NONE;
+    }
+
+    private void panelTap(float x, float y) {
+        if (lookMinus.contains(x, y)) {
+            lookSpeed = Math.max(0.2f, Math.round((lookSpeed - 0.2f) * 10f) / 10f);
+        } else if (lookPlus.contains(x, y)) {
+            lookSpeed = Math.min(4.0f, Math.round((lookSpeed + 0.2f) * 10f) / 10f);
+        } else if (runMinus.contains(x, y)) {
+            runThreshold = Math.max(0.30f, Math.round((runThreshold - 0.05f) * 100f) / 100f);
+        } else if (runPlus.contains(x, y)) {
+            runThreshold = Math.min(0.95f, Math.round((runThreshold + 0.05f) * 100f) / 100f);
+        } else if (invertBox.contains(x, y)) {
+            invertLook = !invertLook;
+        } else if (closeBox.contains(x, y) || !panel.contains(x, y)) {
+            panelOpen = false;
+        }
+        saveSettings();
     }
 
     // ---- drawing ----
@@ -221,7 +322,7 @@ public class TouchOverlay extends View {
             kx = kx * stickRadius / len;
             ky = ky * stickRadius / len;
         }
-        fillPaint.setColor(0x66FFFFFF);
+        fillPaint.setColor(kRun ? 0x99FFFFFF : 0x66FFFFFF);
         c.drawCircle(stickX + kx, stickY + ky, stickRadius * 0.4f, fillPaint);
 
         // buttons
@@ -231,5 +332,40 @@ public class TouchOverlay extends View {
             c.drawCircle(b.x, b.y, b.r, ringPaint);
             c.drawText(b.label, b.x, b.y + textPaint.getTextSize() * 0.35f, textPaint);
         }
+
+        if (panelOpen) drawPanel(c);
+    }
+
+    private void drawPanel(Canvas c) {
+        fillPaint.setColor(0xEE101010);
+        c.drawRoundRect(panel, 30f, 30f, fillPaint);
+        c.drawRoundRect(panel, 30f, 30f, ringPaint);
+
+        float left = panel.left + 0.05f * panel.width();
+        float off = leftText.getTextSize() * 0.35f;
+
+        c.drawText("Settings", panel.centerX(), titleY + off, textPaint);
+
+        c.drawText(String.format(Locale.US, "Look speed: %.1fx", lookSpeed),
+                left, rowLookY + off, leftText);
+        drawSmallButton(c, lookMinus, "-");
+        drawSmallButton(c, lookPlus, "+");
+
+        c.drawText(String.format(Locale.US, "Run when pushed: %d%%", Math.round(runThreshold * 100f)),
+                left, rowRunY + off, leftText);
+        drawSmallButton(c, runMinus, "-");
+        drawSmallButton(c, runPlus, "+");
+
+        c.drawText("Invert look up/down", left, rowInvertY + off, leftText);
+        drawSmallButton(c, invertBox, invertLook ? "ON" : "OFF");
+
+        drawSmallButton(c, closeBox, "CLOSE");
+    }
+
+    private void drawSmallButton(Canvas c, RectF r, String label) {
+        fillPaint.setColor(0x44FFFFFF);
+        c.drawRoundRect(r, 16f, 16f, fillPaint);
+        c.drawRoundRect(r, 16f, 16f, ringPaint);
+        c.drawText(label, r.centerX(), r.centerY() + textPaint.getTextSize() * 0.35f, textPaint);
     }
 }

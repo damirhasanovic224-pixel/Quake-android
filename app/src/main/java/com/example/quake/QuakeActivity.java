@@ -92,6 +92,7 @@ public class QuakeActivity extends SDLActivity {
               + "bind ENTER \"+attack\"\n"
               + "bind SPACE \"+jump\"\n"
               + "bind e \"impulse 10\"\n"
+              + "bind SHIFT \"+speed\"\n"
               + "scr_menuscale 3\n"
               + "scr_sbarscale 3\n"
               + "scr_conscale 3\n"
