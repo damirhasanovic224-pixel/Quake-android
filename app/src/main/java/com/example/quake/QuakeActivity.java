@@ -15,6 +15,7 @@ public class QuakeActivity extends SDLActivity {
         } catch (UnsatisfiedLinkError ignored) {
         }
         System.loadLibrary("SDL2");
+        System.loadLibrary("GL");
         System.loadLibrary("main");   // our Quake engine; pulls in libGL (gl4es)
     }
 
