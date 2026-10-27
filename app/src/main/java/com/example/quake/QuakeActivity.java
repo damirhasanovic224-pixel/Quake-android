@@ -126,7 +126,8 @@ public class QuakeActivity extends SDLActivity {
               + "scr_sbarscale 3\n"
               + "scr_conscale 3\n"
               + "crosshair 1\n"
-              + "scr_showfps 1\n";
+              + "scr_showfps 1\n"
+              + "+mlook\n";
             FileOutputStream out = new FileOutputStream(new File(dir, "autoexec.cfg"));
             out.write(cfg.getBytes("UTF-8"));
             out.close();

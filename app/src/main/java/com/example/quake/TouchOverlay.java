@@ -26,23 +26,27 @@ public class TouchOverlay extends View {
     private static class Btn {
         final String label;
         final int key;          // 0 = not a key button
+        final boolean look;     // sliding a finger that started here also aims
         float x, y, r;
         boolean pressed;
-        Btn(String label, int key) {
+        Btn(String label, int key, boolean look) {
             this.label = label;
             this.key = key;
+            this.look = look;
         }
     }
 
-    private final Btn fire = new Btn("FIRE", KeyEvent.KEYCODE_ENTER);
-    private final Btn jump = new Btn("JUMP", KeyEvent.KEYCODE_SPACE);
-    private final Btn weapon = new Btn("WPN", KeyEvent.KEYCODE_E);
-    private final Btn menu = new Btn("MENU", KeyEvent.KEYCODE_ESCAPE);
-    private final Btn settingsBtn = new Btn("SET", 0);
+    private final Btn fire = new Btn("FIRE", KeyEvent.KEYCODE_ENTER, true);
+    private final Btn jump = new Btn("JUMP", KeyEvent.KEYCODE_SPACE, true);
+    private final Btn weapon = new Btn("WPN", KeyEvent.KEYCODE_E, false);
+    private final Btn menu = new Btn("MENU", KeyEvent.KEYCODE_ESCAPE, false);
+    private final Btn settingsBtn = new Btn("SET", 0, false);
     private final Btn[] buttons = { fire, jump, weapon, menu, settingsBtn };
 
     private final int[] role = new int[MAX_POINTERS];
     private final Btn[] heldButton = new Btn[MAX_POINTERS];
+    private final float[] btnLastX = new float[MAX_POINTERS];
+    private final float[] btnLastY = new float[MAX_POINTERS];
 
     // movement stick
     private int stickId = -1;
@@ -215,6 +219,8 @@ public class TouchOverlay extends View {
                 b.pressed = true;
                 heldButton[id] = b;
                 role[id] = ROLE_BUTTON;
+                btnLastX[id] = x;
+                btnLastY[id] = y;
                 keyDown(b.key);
                 return;
             }
@@ -255,12 +261,24 @@ public class TouchOverlay extends View {
             float dy = y - lastY;
             lastX = x;
             lastY = y;
-            if (dx != 0f || dy != 0f) {
-                float sy = invertLook ? -lookSpeed : lookSpeed;
-                SDLActivity.onNativeMouse(0, MotionEvent.ACTION_MOVE,
-                        dx * lookSpeed, dy * sy, true);
+            sendLook(dx, dy);
+        } else if (role[id] == ROLE_BUTTON) {
+            Btn b = heldButton[id];
+            if (b != null && b.look) {
+                float dx = x - btnLastX[id];
+                float dy = y - btnLastY[id];
+                btnLastX[id] = x;
+                btnLastY[id] = y;
+                sendLook(dx, dy);
             }
         }
+    }
+
+    private void sendLook(float dx, float dy) {
+        if (dx == 0f && dy == 0f) return;
+        float sy = invertLook ? -lookSpeed : lookSpeed;
+        SDLActivity.onNativeMouse(0, MotionEvent.ACTION_MOVE,
+                dx * lookSpeed, dy * sy, true);
     }
 
     private void pointerUp(int id) {
