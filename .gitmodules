@@ -7,3 +7,9 @@
 [submodule "third_party/quakespasm"]
 	path = third_party/quakespasm
 	url = https://github.com/sezero/quakespasm.git
+[submodule "third_party/ogg"]
+	path = third_party/ogg
+	url = https://github.com/xiph/ogg.git
+[submodule "third_party/vorbis"]
+	path = third_party/vorbis
+	url = https://github.com/xiph/vorbis.git

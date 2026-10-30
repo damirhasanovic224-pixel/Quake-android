@@ -42,6 +42,39 @@ else()
     file(WRITE "${CMAKE_BINARY_DIR}/gl_props_before.txt" "No CMake target named GL exists\n")
 endif()
 
+# ---------------- Ogg Vorbis (music tracks) ----------------
+set(OGG_DIR    "${TP}/ogg")
+set(VORBIS_DIR "${TP}/vorbis")
+add_library(oggvorbis STATIC
+    ${OGG_DIR}/src/bitwise.c
+    ${OGG_DIR}/src/framing.c
+    ${VORBIS_DIR}/lib/mdct.c
+    ${VORBIS_DIR}/lib/smallft.c
+    ${VORBIS_DIR}/lib/block.c
+    ${VORBIS_DIR}/lib/envelope.c
+    ${VORBIS_DIR}/lib/window.c
+    ${VORBIS_DIR}/lib/lsp.c
+    ${VORBIS_DIR}/lib/lpc.c
+    ${VORBIS_DIR}/lib/analysis.c
+    ${VORBIS_DIR}/lib/synthesis.c
+    ${VORBIS_DIR}/lib/psy.c
+    ${VORBIS_DIR}/lib/info.c
+    ${VORBIS_DIR}/lib/floor1.c
+    ${VORBIS_DIR}/lib/floor0.c
+    ${VORBIS_DIR}/lib/res0.c
+    ${VORBIS_DIR}/lib/mapping0.c
+    ${VORBIS_DIR}/lib/registry.c
+    ${VORBIS_DIR}/lib/codebook.c
+    ${VORBIS_DIR}/lib/sharedbook.c
+    ${VORBIS_DIR}/lib/lookup.c
+    ${VORBIS_DIR}/lib/bitrate.c
+    ${VORBIS_DIR}/lib/vorbisfile.c)
+set_target_properties(oggvorbis PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(oggvorbis
+    PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/compat ${OGG_DIR}/include ${VORBIS_DIR}/include
+    PRIVATE ${VORBIS_DIR}/lib)
+target_compile_options(oggvorbis PRIVATE -w -Wno-implicit-function-declaration)
+
 # ---------------- QuakeSpasm ----------------
 file(GLOB QS_SOURCES CONFIGURE_DEPENDS "${QS_DIR}/*.c")
 
@@ -54,6 +87,7 @@ add_library(main SHARED ${QS_SOURCES} android_log.c)
 target_compile_definitions(main PRIVATE
     USE_SDL2
     USE_CODEC_WAVE
+    USE_CODEC_VORBIS
     USE_QS_CONLINES)
 
 target_include_directories(main PRIVATE ${QS_DIR} ${SDL_DIR}/include)
@@ -67,4 +101,4 @@ target_compile_options(main PRIVATE
 if(TARGET SDL2::SDL2main)
     target_link_libraries(main PRIVATE SDL2::SDL2main)
 endif()
-target_link_libraries(main PRIVATE SDL2::SDL2 GL log m)
+target_link_libraries(main PRIVATE SDL2::SDL2 GL oggvorbis log m)
